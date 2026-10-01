@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- Envelope body -->
+  <path
+      android:pathData="M18,36 L90,36 L90,78 L18,78 Z"
+      android:fillColor="#FFFFFF"
+      android:strokeColor="#CCCCCC"
+      android:strokeWidth="2" />
+  <!-- Envelope flap -->
+  <path
+      android:pathData="M18,36 L54,60 L90,36"
+      android:fillColor="none"
+      android:strokeColor="#6C63FF"
+      android:strokeWidth="3" />
+  <!-- Signal waves (SMS indicator) -->
+  <path
+      android:pathData="M70,22 Q78,18 78,12 Q78,6 70,2"
+      android:fillColor="none"
+      android:strokeColor="#22C55E"
+      android:strokeWidth="2.5"
+      android:strokeLineCap="round" />
+  <path
+      android:pathData="M74,25 Q86,20 86,12 Q86,4 74,0"
+      android:fillColor="none"
+      android:strokeColor="#22C55E"
+      android:strokeWidth="2"
+      android:strokeLineCap="round" />
+</vector>
