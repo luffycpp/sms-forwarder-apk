@@ -2,23 +2,36 @@ package cyou.famflow.smsforwarder
 
 import android.app.*
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 
 class ForwarderService : Service() {
 
     private val CHANNEL_ID = "famflow_sms_channel"
     private val NOTIFICATION_ID = 1001
+    private val TAG = "ForwarderService"
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            createNotificationChannel()
+            val notification = buildNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground: ${e.message}")
+            // Still keep service running even without foreground notification
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY // auto-restart if killed
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -32,11 +45,12 @@ class ForwarderService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("FamFlow SMS Forwarder")
-            .setContentText("🟢 Listening for Airtel Bank SMS...")
+            .setContentText("Listening for Airtel Bank SMS...")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setSilent(true)
             .build()
     }
 
@@ -45,12 +59,15 @@ class ForwarderService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "SMS Forwarder",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
                 description = "Keeps SMS forwarding running in background"
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
     }
 }

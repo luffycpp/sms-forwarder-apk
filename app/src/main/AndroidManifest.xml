@@ -2,17 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- SMS Permissions -->
+    <!-- SMS - only RECEIVE needed, READ_SMS removed to reduce security flags -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
 
-    <!-- Network Permission to forward SMS -->
+    <!-- Network to forward SMS to webhook -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Keep app alive in background -->
+    <!-- Keep alive -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -36,7 +36,6 @@
             </intent-filter>
         </activity>
 
-        <!-- SMS BroadcastReceiver — must have high priority to intercept SMS -->
         <receiver
             android:name=".SmsReceiver"
             android:enabled="true"
@@ -47,7 +46,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Boot receiver to restart forwarder after reboot -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -58,7 +56,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Foreground service to keep alive -->
         <service
             android:name=".ForwarderService"
             android:enabled="true"
