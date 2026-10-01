@@ -1,2 +1,10 @@
-# Auto detect text files and perform LF normalization
+﻿# Auto detect text files and perform LF normalization
 * text=auto
+
+# Force LF for gradlew
+gradlew text eol=lf
+
+# Binary files
+*.jar binary
+*.png binary
+*.apk binary
