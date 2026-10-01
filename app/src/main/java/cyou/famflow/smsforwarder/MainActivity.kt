@@ -3,9 +3,12 @@ package cyou.famflow.smsforwarder
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -48,7 +51,6 @@ class MainActivity : AppCompatActivity() {
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
 
-        // Load saved prefs
         etWebhookUrl.setText(prefs.getString("webhook_url", "https://famflow.cyou/api/sms/airtel"))
         etFilterSenders.setText(prefs.getString("filter_senders", "AX-AIRTEL,BW-AIRTEL,AIRTEL,AIRINB,JK-AIRTEL"))
         switchEnabled.isChecked = prefs.getBoolean("enabled", true)
@@ -59,12 +61,10 @@ class MainActivity : AppCompatActivity() {
         btnSave.setOnClickListener {
             saveSettings()
             startForwarderService()
-            Toast.makeText(this, "✅ Settings saved!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
         }
 
-        btnTest.setOnClickListener {
-            testWebhook()
-        }
+        btnTest.setOnClickListener { testWebhook() }
 
         switchEnabled.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("enabled", isChecked).apply()
@@ -76,93 +76,40 @@ class MainActivity : AppCompatActivity() {
         startForwarderService()
     }
 
-    private fun saveSettings() {
-        prefs.edit()
-            .putString("webhook_url", etWebhookUrl.text.toString().trim())
-            .putString("filter_senders", etFilterSenders.text.toString().trim().uppercase())
-            .putBoolean("enabled", switchEnabled.isChecked)
-            .apply()
+    override fun onResume() {
+        super.onResume()
+        loadLogs()
+        updateStatusUI()
     }
 
-    private fun testWebhook() {
-        val url = etWebhookUrl.text.toString().trim()
-        if (url.isEmpty()) {
-            Toast.makeText(this, "❌ Enter webhook URL first", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        btnTest.isEnabled = false
-        btnTest.text = "Testing..."
-
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    val client = OkHttpClient()
-                    val json = JSONObject().apply {
-                        put("sender", "AX-AIRTEL")
-                        put("body", "Your A/c XX1234 debited Rs.500.00 on 01-10-26. UPI Ref: 123456789. If not done by you, call 400. -Airtel Bank")
-                        put("timestamp", System.currentTimeMillis())
-                        put("source", "test")
-                    }
-                    val body = json.toString().toRequestBody("application/json".toMediaType())
-                    val request = Request.Builder().url(url).post(body).build()
-                    val response = client.newCall(request).execute()
-                    "HTTP ${response.code}: ${response.body?.string()?.take(100)}"
-                } catch (e: Exception) {
-                    "Error: ${e.message}"
-                }
-            }
-            btnTest.isEnabled = true
-            btnTest.text = "🧪 Test Webhook"
-            appendLog("TEST → $result")
-            Toast.makeText(this@MainActivity, result, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun startForwarderService() {
-        if (prefs.getBoolean("enabled", true)) {
-            val intent = Intent(this, ForwarderService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-        }
-    }
-
-    private fun stopForwarderService() {
-        stopService(Intent(this, ForwarderService::class.java))
+    private fun hasSmsPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECEIVE_SMS
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun updateStatusUI() {
         val enabled = prefs.getBoolean("enabled", true)
-        tvStatus.text = if (enabled) "🟢 Forwarder Active" else "🔴 Forwarder Stopped"
-        tvStatus.setTextColor(
-            ContextCompat.getColor(this, if (enabled) R.color.green else R.color.red)
-        )
-    }
+        val hasPermission = hasSmsPermission()
 
-    fun appendLog(message: String) {
-        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-        val time = sdf.format(Date())
-        val currentLog = prefs.getString("logs", "") ?: ""
-        val newLog = "[$time] $message\n$currentLog"
-        val trimmed = newLog.lines().take(50).joinToString("\n") // keep last 50 entries
-        prefs.edit().putString("logs", trimmed).apply()
-        runOnUiThread {
-            tvLogs.text = trimmed
+        when {
+            !hasPermission -> {
+                tvStatus.text = "❌ SMS Permission Required"
+                tvStatus.setTextColor(ContextCompat.getColor(this, R.color.red))
+            }
+            enabled -> {
+                tvStatus.text = "🟢 Forwarder Active"
+                tvStatus.setTextColor(ContextCompat.getColor(this, R.color.green))
+            }
+            else -> {
+                tvStatus.text = "🔴 Forwarder Stopped"
+                tvStatus.setTextColor(ContextCompat.getColor(this, R.color.red))
+            }
         }
     }
 
-    private fun loadLogs() {
-        tvLogs.text = prefs.getString("logs", "No logs yet. Waiting for SMS...") ?: ""
-    }
-
     private fun checkAndRequestPermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_SMS
-        )
+        val permissions = mutableListOf(Manifest.permission.RECEIVE_SMS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -181,15 +128,114 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSIONS_REQUEST_CODE) {
-            val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-            if (!allGranted) {
-                Toast.makeText(this, "⚠️ SMS permission denied — app won't work!", Toast.LENGTH_LONG).show()
+            val smsIndex = permissions.indexOf(Manifest.permission.RECEIVE_SMS)
+            val smsGranted = smsIndex != -1 && grantResults[smsIndex] == PackageManager.PERMISSION_GRANTED
+
+            if (!smsGranted) {
+                showPermissionSettingsDialog()
+            }
+            updateStatusUI()
+        }
+    }
+
+    private fun showPermissionSettingsDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("SMS Permission Required")
+            .setMessage(
+                "Android blocked SMS access for sideloaded apps.\n\n" +
+                "To fix this:\n" +
+                "1. Tap 'Open Settings' below\n" +
+                "2. Tap 'Permissions'\n" +
+                "3. Tap 'SMS'\n" +
+                "4. Select 'Allow'\n" +
+                "5. Come back to this app"
+            )
+            .setPositiveButton("Open Settings") { _, _ ->
+                openAppSettings()
+            }
+            .setNegativeButton("Cancel", null)
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        startActivity(intent)
+    }
+
+    private fun saveSettings() {
+        prefs.edit()
+            .putString("webhook_url", etWebhookUrl.text.toString().trim())
+            .putString("filter_senders", etFilterSenders.text.toString().trim().uppercase())
+            .putBoolean("enabled", switchEnabled.isChecked)
+            .apply()
+    }
+
+    private fun testWebhook() {
+        val url = etWebhookUrl.text.toString().trim()
+        if (url.isEmpty()) {
+            Toast.makeText(this, "Enter webhook URL first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        btnTest.isEnabled = false
+        btnTest.text = "Testing..."
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val client = OkHttpClient()
+                    val json = JSONObject().apply {
+                        put("sender", "AX-AIRTEL")
+                        put("body", "Your A/c XX1234 debited Rs.500.00 on 01-10-26. UPI Ref: 123456789.")
+                        put("timestamp", System.currentTimeMillis())
+                        put("source", "test")
+                    }
+                    val body = json.toString().toRequestBody("application/json".toMediaType())
+                    val request = Request.Builder().url(url).post(body).build()
+                    val response = client.newCall(request).execute()
+                    "HTTP ${response.code}"
+                } catch (e: Exception) {
+                    "Error: ${e.message}"
+                }
+            }
+            btnTest.isEnabled = true
+            btnTest.text = "Test"
+            appendLog("TEST → $result")
+            Toast.makeText(this@MainActivity, result, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun startForwarderService() {
+        if (prefs.getBoolean("enabled", true)) {
+            try {
+                val intent = Intent(this, ForwarderService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            } catch (e: Exception) {
+                appendLog("Service start failed: ${e.message}")
             }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        loadLogs()
+    private fun stopForwarderService() {
+        stopService(Intent(this, ForwarderService::class.java))
+    }
+
+    fun appendLog(message: String) {
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val time = sdf.format(Date())
+        val currentLog = prefs.getString("logs", "") ?: ""
+        val newLog = "[$time] $message\n$currentLog"
+        val trimmed = newLog.lines().take(50).joinToString("\n")
+        prefs.edit().putString("logs", trimmed).apply()
+        runOnUiThread { tvLogs.text = trimmed }
+    }
+
+    private fun loadLogs() {
+        tvLogs.text = prefs.getString("logs", "No logs yet. Waiting for SMS...") ?: ""
     }
 }
