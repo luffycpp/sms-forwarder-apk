@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         scrollLogs = findViewById(R.id.scrollLogs)
 
         etWebhookUrl.setText(prefs.getString("webhook_url", "https://famflow.cyou/api/sms/airtel"))
-        etFilterSenders.setText(prefs.getString("filter_senders", "AX-AIRTEL,BW-AIRTEL,AIRTEL,AIRINB,JK-AIRTEL"))
+        etFilterSenders.setText(prefs.getString("filter_senders", "AX-AIRBNK-S,AX-AIRTEL,BW-AIRTEL,AIRTEL,AIRINB,JK-AIRTEL"))
         switchEnabled.isChecked = prefs.getBoolean("enabled", true)
 
         loadLogs()
