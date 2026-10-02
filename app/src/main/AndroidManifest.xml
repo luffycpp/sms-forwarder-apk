@@ -2,8 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- SMS - only RECEIVE needed, READ_SMS removed to reduce security flags -->
+    <!-- SMS permissions -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
 
     <!-- Network to forward SMS to webhook -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -24,6 +25,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FamFlowSMS"
         android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
         <activity
@@ -35,6 +37,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <receiver
             android:name=".SmsReceiver"

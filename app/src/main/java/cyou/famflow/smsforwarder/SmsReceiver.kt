@@ -75,7 +75,7 @@ class SmsReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         scope.launch {
             try {
-                forwardSms(webhookUrl, sender, body, timestamp)
+                forwardSms(context, webhookUrl, sender, body, timestamp)
                 logToPrefs(prefs, "✅ Forwarded from $sender")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to forward SMS", e)
@@ -86,7 +86,10 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun forwardSms(url: String, sender: String, body: String, timestamp: Long) {
+    private fun forwardSms(context: Context, url: String, sender: String, body: String, timestamp: Long) {
+        val prefs = context.getSharedPreferences("famflow_sms", Context.MODE_PRIVATE)
+        val apiKey = prefs.getString("api_key", "") ?: ""
+
         val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
@@ -105,6 +108,7 @@ class SmsReceiver : BroadcastReceiver() {
             .post(requestBody)
             .addHeader("Content-Type", "application/json")
             .addHeader("X-Source", "famflow-sms-forwarder")
+            .addHeader("Authorization", "Bearer $apiKey")
             .build()
 
         val response = client.newCall(request).execute()
